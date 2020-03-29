@@ -79,7 +79,7 @@ function love.load()
 	love.graphics.setDefaultFilter('nearest', 'nearest');
 
 
-	love.window.setTitle('Dr. Light Adventure');
+	love.window.setTitle('Light Flight');
 
 
     --megaman ttf font I downloaded. setting different sizes here

@@ -121,7 +121,7 @@ function PlayState:render()
     	wall:render();
 	end;
 
-	love.graphics.setFont(smallFont);
+	love.graphics.setFont(mediumFont);
 	love.graphics.print('Score: ' .. tostring(self.score), 8, 8);
 
 	--Render dr light

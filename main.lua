@@ -12,6 +12,14 @@ require 'Drlight';
 require 'Wall';
 require 'WallPair';
 
+--Code relating to game state and state machines
+require 'StateMachine';
+require 'states/BaseState';
+require 'states/PlayState';
+require 'states/TitleScreenState';
+require 'states/ScoreState';
+require 'states/CountdownState';
+
 
 WINDOW_WIDTH = 1280;
 WINDOW_HEIGHT = 720;
@@ -20,8 +28,8 @@ VIRTUAL_WIDTH = 512;
 VIRTUAL_HEIGHT = 288;
 
 
-local background = love.graphics.newImage("images/background.png");
-local ground = love.graphics.newImage("images/floor.png");
+local background = love.graphics.newImage('images/background.png');
+local ground = love.graphics.newImage('images/floor.png');
 
 
 --Scroll variables to scroll the image left on x axis
@@ -51,10 +59,6 @@ local wallPairs = {};
 local spawnTimer = 0;
 
 
---Wrapped around update function-turn true and stops all update code if collision detected
-local gameover = false;
-
-
 --Love2d method that allows window resizing
 function love.resize(w, h)
     push:resize(w, h);
@@ -70,11 +74,37 @@ end;
 function love.load()
     math.randomseed(os.time());
 
+    love.mouse.setVisible(false);
 
 	love.graphics.setDefaultFilter('nearest', 'nearest');
 
 
 	love.window.setTitle('Dr. Light Adventure');
+
+
+    --megaman ttf font I downloaded. setting different sizes here
+    smallFont = love.graphics.newFont('images/megaman.ttf', 8);
+    mediumFont = love.graphics.newFont('images/megaman.ttf', 14);
+    largeFont = love.graphics.newFont('images/megaman.ttf', 22);
+    hugeFont = love.graphics.newFont('images/megaman.ttf', 40)
+    love.graphics.setFont(smallFont);
+
+
+
+    --initialize table of sounds
+    sounds = {
+        ['rocket'] = love.audio.newSource('sounds/rocket.wav', 'static'),
+        ['rocket2'] = love.audio.newSource('sounds/rocket2.wav', 'static'),
+        ['death'] = love.audio.newSource('sounds/death.wav', 'static'),
+        ['score'] = love.audio.newSource('sounds/score.wav', 'static'),
+        ['theme'] = love.audio.newSource('sounds/theme.mp3', 'static'),
+    };
+
+
+
+    --kick off music at the start
+    sounds['theme']:setLooping(true);
+    sounds['theme']:play();
 
 
     --Initiailize our window the the virtual resolution
@@ -83,6 +113,16 @@ function love.load()
         resizable = true,
         vsync = true
     });
+
+
+    --Initialize state machine with all state-returning functions and set it initially to title state. These keys map to functions that will return our states.
+    gStateMachine = StateMachine {
+        ['title'] = function() return TitleScreenState() end,
+        ['play'] = function() return PlayState() end,
+        ['score'] = function() return ScoreState() end,
+        ['countdown'] = function() return CountdownState() end,
+    };
+    gStateMachine:change('title');
 
 
     --Setting up our own global empty table(keysPressed) in the love.keyboard object to keep track of keys pressed
@@ -97,73 +137,13 @@ end;
     Runs every frame, with "dt" passed in, our delta in seconds since the last frame, which LÖVE2D supplies us
 ]]
 function love.update(dt)
-  if gameover == false then
-
-
     --Scrolling our background and ground using %, which also resets to 0 at end of looping point. 
     backgroundScroll = (backgroundScroll + (BACKGROUND_SCROLL_SPEED * dt)) % BACKGROUND_LOOPING_POINT;
     groundScroll = (groundScroll + (GROUND_SCROLL_SPEED * dt)) % GROUND_LOOPING_POINT; 
 
 
-    -- Set our spawnTimer to be equal to itself + dt so it essentially just counts
-    spawnTimer = spawnTimer + dt;
-
-
-    --Check if spawnTimer is greater than 2(2 seconds). If so, spawn a random height wall
-    if spawnTimer > 2 then
-
-        --Our initial Y is based off of our top FLIPPED wall location. remember our bottom wall is drawn based off of this, but just with a + GAP_WIDTH distance apart on the y axis, as in WALL_HEIGHT + GAP_HEIGHT. SO, remember the drawing, the initial flip, our Y data point is STILL on the top left of the image, it doesn't matter if it is upside down. So at -288 the BOTTOM of our image is at the 0 point on the Y axis(the top of the screen) and when we set it to -200 like below, we are moving the image lower and lower, same for the opposite, a smaller negative number moves the image farther above off screen. -200 seemed about a decent starting point as I was shooting for roughly mid screen with the 90 pixel gap
-        initialAndLastY = -200;
-
-
-        --Modify the initialAndLastY coordinate placed above
-        --we do not want a y position to go any higher than 25 pixels below the top edge of the screen(25 is aproximately the pixel height of the top(aka the bottom since it was flipped) of my wall + the blades so I can still see both without them getting cut off)
-        --and no lower than approximately my spikes + my wall and blades(120 pixels) from the bottom
-        local y = math.max(-WALL_HEIGHT + 25, math.min(initialAndLastY + math.random(-75, 75), -120));
-
-        --Uncomment the below to enable a smoother contour and easier playing experience. By setting initialAndLastY to be y, our next y position will be within a closer threshold of the previous y position, since the previous y would be based off this position.
-
-        -- initialAndLastY = y;
-
-
-        --Inserts walls, aka 'WallPair' into our wallPairs table. WallPair takes a (y) that will be where the start of the gap is between the top and bottom walls
-        table.insert(wallPairs, WallPair(y));
-
-
-        --Reset ospawnTimer to 0 so that spawnTimer > 2 will be false again
-        spawnTimer = 0;
-    end;
-
-
-    --To iterate over our wallsTable, lua gives you a function called 'pairs', that gives you all the key/value pairs of a table that you can then use while your iterating over it. Doing this will actually give you the keys of each pair. NOTE: i is the key and wall will be the value
-    for i, wall in pairs(wallPairs) do 
-
-        --Update each wall, top and bottom by dt
-        wall:update(dt);
-
-
-        --Check lights collision with walls and set gameover to true if he does
-        if drlight:collides(wall.walls.upper) == true or drlight:collides(wall.walls.lower) == true then
-            gameover = true;
-        end;
-    end;
-
-
-    --Removes each wall pair at i position, which will be the 1 position in our object each time since we constantly remove the one on the left of the screen.
-    for i, wall in pairs(wallPairs) do
-        if wall.remove == true then
-            table.remove(wallPairs, i);
-        end;
-    end;
-
-
-    --Update light and blade animation on the wall. WallPair.lua updates the actual walls
-    drlight:update(dt);
-    Wall:update(dt);
-
-
-  --End of our gameover if statement encapsulating all the code above.
-  end;
+    --we not just update the state machine, instead of all our update logic we had before, which I have stored in relicupdate.lua for reference. When we call the below, it is going to look, see what our current state is, and perform the update logic for that state.
+    gStateMachine:update(dt);
 
 
     --Setting our table back to empty because we just want to check this table frame by frame. If we did not, every key would we pressed would always be set to true, so there would be no way of telling what the last key pressed was.
@@ -190,22 +170,12 @@ function love.draw()
     love.graphics.draw(background, -backgroundScroll, 0);
 
 
-    --Drawing each of our walls, stored in wallPairs
-    for i, walls in pairs(wallPairs) do
-        walls:render();
-    end;
+    --Draw the state machine between the background and ground and defer render logic to the currently active state. Old draw logic is stored in relicdraw.lua for reference
+    gStateMachine:render();
 
 
     --Drawing the ground spikes at -x value so it scrolls left
     love.graphics.draw(ground, -groundScroll, VIRTUAL_HEIGHT - 15);
-
-
-    --Render dr light
-    drlight:render();
-
-
-	--Drawing random stats, fps, etc
-   	displayFPS();
 
 
     --End rendering at virtual resolution
@@ -222,7 +192,6 @@ end;
 function love.keypressed(key)
     --since love.keypressed is given to us by lua, we can use the below. Now, anytime a key is pressed we will push it to our keysPressed {}.
     love.keyboard.keysPressed[key] = true;
-
 
 	if key == 'escape' then
 		love.event.quit();
@@ -246,15 +215,3 @@ end;
 
 
 
-
-
---[[
-    Renders the current FPS and other stuff.
-]]
-function displayFPS()
-    -- simple FPS display across all states
-    love.graphics.print('FPS: ' .. tostring(love.timer.getFPS()), 0, 0);
-    -- love.graphics.print('Background: ' .. tostring(background:getWidth()), 0, 10);
-    -- love.graphics.print('Ground: ' .. tostring(ground:getWidth()), 0, 20);
-    -- love.graphics.print('Spawn Timer: ' .. tostring(spawnTimer), 0, 30);
-end;

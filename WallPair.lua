@@ -3,14 +3,14 @@
 ]]--
 
 
-WallPair = Class{}
+WallPair = Class{};
+
+
+
 
 
 --Size of the gap between the walls, as in top and bottom, the gap between the 2 pair
 GAP_HEIGHT  = 90;
-
-
-
 
 
 function WallPair:init(y)
@@ -30,6 +30,10 @@ function WallPair:init(y)
 
 	--Whether this wall pair is ready to be removed from the scene.
 	self.remove = false;
+
+
+	--Whether or not this pair of pipes has been scored. Setting it to true IF dr light has gone past the right edge, which would be wall.x + wall.width.
+	self.scored = false;
 end;
 
 

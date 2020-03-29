@@ -48,9 +48,9 @@ function Drlight:collides(wall)
 	--AABB Collision Detection. Just remember it is a bit confusing since our top wall is flipped, so visually, top is bottom, bottom is top for the top wall.
 	
 	--Lights face vs front of walls -AND- Back of lights head vs right side of walls
-	if self.x + (self.width - 4) >= wall.x and (self.x + 15) <= (wall.x + wall.width) and
+	if self.x + (self.width - 4) >= wall.x and (self.x + 17) <= (wall.x + wall.width) and
 	--Bottom of light vs top of walls    -And-     Top of lights head vs bottom of wall
-		self.y + (self.height - 4) >= wall.y and (self.y + 2) <= (wall.y + wall.height)then
+		self.y + (self.height - 4) >= wall.y and (self.y + 3) <= (wall.y + wall.height)then
 		return true;
 	end;
 	return false;
@@ -72,6 +72,8 @@ function Drlight:update(dt)
 	--Setting our dy to -5 so it goes the negative value, towards top of screen. Remember wasPressed is our table we created and if the key 'f' was pressed, it was inserted into the table with a value of true.
 	if love.keyboard.wasPressed('f') == true then
 		self.dy = ANTI_GRAVITY;
+		sounds['rocket']:play();
+		sounds['rocket2']:play();
 	end;
 
 	--Dr light animation basedd on dy value, which is only < 0 when going up
